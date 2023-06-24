@@ -1,0 +1,8 @@
+venv/
+*.wav
+*.mp4
+*.3gpp
+*.mp3
+.env
+.vscode/
+.idea/
