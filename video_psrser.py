@@ -1,46 +1,47 @@
-import yt_dlp
 import speech_recognition as sr
+import requests
 from pydub import AudioSegment
+import os
 
+# initialize recognizer
+r = sr.Recognizer()
 
-# Download the video using yt-dlp
-ydl_opts = {'format': 'bestaudio/best'}
-with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-    info_dict = ydl.extract_info('https://www.youtube.com/watch?v=VVxXIUYjRmQ', download=False)
-    audio_url = info_dict['url']
+# open the audio file using pydub
+audio = AudioSegment.from_file("Audio_lecture.wav", format="wav")
 
-# Load audio file
-r = sr.AudioFile('Запись.wav')
+# break the audio into chunks of 30 seconds each
+chunk_length_ms = 30000
+chunks = [audio[i:i+chunk_length_ms] for i in range(0, len(audio), chunk_length_ms)]
 
-# Initialize recognizer
-recognizer = sr.Recognizer()
+# loop through the chunks and recognize speech in each one
+for i, chunk in enumerate(chunks):
+    # export the chunk to a WAV file
+    chunk.export("chunk{0}.wav".format(i), format="wav")
 
-# Open the audio file using the recognizer
-with r as source:
-    audio_text = recognizer.record(source)
+    # recognize the speech in the chunk
+    with sr.AudioFile("chunk{0}.wav".format(i)) as source:
+        audio_data = r.record(source)
+        text = r.recognize_google(audio_data, language='ru-RU')
+        print(text)
 
-# Convert audio to text
-text = recognizer.recognize_google(audio_text, language='ru-RU')
-print(text)
+        # save the text to a file
+        with open("recognized_text.txt", "a") as file:
+            file.write(text)
 
-# # Download the audio file and save as .wav format
-# r = sr.Recognizer()
-# audio_data = sr.AudioFile(audio_url)
-# # with audio_data as source:
-# #     audio_file = r.record(source)
-# #     audio = AudioSegment.from_file(source)
-# # audio.export("audio.wav", format="wav")
-#
-# # Transcribe the audio into text using Google's speech recognition API
-# with sr.AudioFile("Запись.wav") as source:
-#     audio = r.record(source)
-# text = r.recognize_google(audio)
-# print(text)
-#
-# # Divide the text into logical paragraphs
-# text = text.replace("\n", " ")
-# paragraphs = text.split(". ")
-# for i, para in enumerate(paragraphs):
-#     # Output each paragraph with its corresponding timecode in the video
-#     time_in_seconds = audio.get_position() / 1000
-#     print("Paragraph {}: {} ({} seconds)".format(i+1, para, time_in_seconds))
+    # delete the temporary WAV file
+    os.remove("chunk{0}.wav".format(i))
+
+# read the text from the file
+with open('recognized_text.txt', 'r') as f:
+    text = f.read()
+
+# send a post request to Punctuator API with the text
+response = requests.post('http://bark.phon.ioc.ee/punctuator', data={'text': text})
+
+# get the punctuated text from the response
+punctuated_text = response.text
+
+# write the punctuated text to a file
+with open('punctuated_file.txt', 'w') as f:
+    f.write(punctuated_text)
+
